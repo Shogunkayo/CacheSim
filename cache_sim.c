@@ -1,9 +1,10 @@
-#include<stdlib.h>
-#include<stdio.h>
-#include<omp.h>
-#include<string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <omp.h>
+#include <string.h>
+#include <unistd.h>
 
-#define NUMTHREADS 4
+#define NUMTHREADS 2
 #define BUSCAPACITY 1000
 
 typedef char byte;
@@ -28,7 +29,7 @@ struct decoded_inst {
 };
 
 struct bus_transaction {
-	int type; // 0 is Read and Exclusive, 1 is Write, 2 is Read and Shared
+	int type;
 	byte address;
 	int issue_id;
 };
@@ -97,6 +98,7 @@ void cpu_loop(int thread_num) {
     char inst_line[20];
 
     while (fgets(inst_line, sizeof(inst_line), inst_file)){
+        sleep((thread_num + 1) * 2); 
         #ifdef DEBUG
             print_bus(thread_num, local_top);
         #endif
@@ -107,18 +109,43 @@ void cpu_loop(int thread_num) {
 				int hash = snoop_t.address % cache_size;
 				if (c[hash].address == snoop_t.address) {
                     switch(snoop_t.type) {
-                        case 0: c[hash].state = SHARED;
-                                transaction t = {2, snoop_t.address, thread_num};
-                                #pragma omp critical
-                                {
-                                    shared_bus[(top++ % BUSCAPACITY)] = t;
+                        case 0: 
+                                if (c[hash].state == MODIFIED) {
+                                    // write back to memory on read miss
+                                    #pragma omp critical
+                                    {
+                                        *(memory + c[hash].address) = c[hash].value;
+                                    }
+                                    // signal the cache that read the cacheline to read the updated value
+                                    transaction t = {3, snoop_t.address, thread_num};
+                                    #pragma omp critical
+                                    {
+                                        shared_bus[(top++ % BUSCAPACITY)] = t;
+                                    }
                                 }
+                                else if (c[hash].state == EXCLUSIVE || c[hash].state == SHARED) {
+                                    // signal the cache that read the cacheline that cacheline is SHARED
+                                    transaction t = {2, snoop_t.address, thread_num};
+                                    #pragma omp critical
+                                    {
+                                        shared_bus[(top++ % BUSCAPACITY)] = t;
+                                    }
+                                }
+                                c[hash].state = SHARED;
                                 break;
 
                         case 1: c[hash].state = INVALID;
                                 break;
 
                         case 2: c[hash].state = SHARED;
+                                break;
+
+                        case 3:
+                                // cachline will be in EXCLUSIVE on read miss initially
+                                if (c[hash].state == EXCLUSIVE) {
+                                    c[hash].value = *(memory + c[hash].address);
+                                    c[hash].state = SHARED;
+                                }
                                 break;
                     }
 				}
@@ -146,6 +173,7 @@ void cpu_loop(int thread_num) {
             if (inst.type == 0) {
                 cacheline.value = *(memory + inst.address);
                 cacheline.state = EXCLUSIVE;
+                // signal the bus that a cache is reading a cacheline
                 transaction t = {0, inst.address, thread_num};
                 #pragma omp critical
                 {
@@ -156,6 +184,7 @@ void cpu_loop(int thread_num) {
             else {
                 cacheline.value = inst.value;
                 cacheline.state = MODIFIED;
+                // signal the bus that a cache is reading and writing to a cacheline
                 transaction t = {1, inst.address, thread_num};
                 #pragma omp critical
                 {
@@ -165,7 +194,7 @@ void cpu_loop(int thread_num) {
         }
         else {
             // read on invalid state treated as read miss
-            // all other reads retain their state so no transaction
+            // all other reads retain their state so no transaction needed
             if (inst.type == 0 && cacheline.state == INVALID) {
                 cacheline.value = *(memory + inst.address);
                 cacheline.state = EXCLUSIVE;
@@ -195,11 +224,11 @@ void cpu_loop(int thread_num) {
 
         switch(inst.type){
             case 0:
-                printf("Core %d: Reading from address %d: %d\n", thread_num+1, cacheline.address, cacheline.value);
+                printf("Core %d: Reading from address %d: %d\tState: %d\n", thread_num+1, cacheline.address, cacheline.value, cacheline.state);
                 break;
             
             case 1:
-                printf("Core %d: Writing to address %d: %d\n", thread_num+1, cacheline.address, cacheline.value);
+                printf("Core %d: Writing to address %d: %d\tState: %d\n", thread_num+1, cacheline.address, cacheline.value, cacheline.state);
                 break;
         }
     }
@@ -219,6 +248,12 @@ int main(int c, char * argv[]) {
     // Let's assume the memory module holds about 24 bytes of data.
     const int memory_size = 24;
     memory = (byte *) malloc(sizeof(byte) * memory_size);
+
+    // initialize the values in memory
+    for (int i = 0; i < memory_size; i++) {
+        memory[i] = i;
+    }
+
 	top  = 0;
 	shared_bus = (transaction *) malloc(sizeof(transaction) * BUSCAPACITY);
 
