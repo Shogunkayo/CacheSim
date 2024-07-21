@@ -3,9 +3,9 @@
 
 The program reads a file `input_0.txt` which consists of a set of instructions, which can be either Reads or Writes, and then executes them. 
 
-Your job is to parallelize this simulator using OpenMP, i.e., turn the single core cache simulator into a multi-core cache simulator. This also means you will need to implement a simple cache coherancy protocol. Implement MESI protocol.
+This cache simulator is parallelized using simulator using OpenMP, turning the single core cache simulator into a multi-core cache simulator. To maintain cache coherence, MESI protocol is implemented.
 
-This assignment will be manually evaluated. Grading will be transparent and any loss of marks will be explained.
+![state machine](https://github.com/Shogunkayo/CacheSim/tree/master/diagrams/statemachine.png)
 
 ## Instruction type:
 There are two instruction types that the simulator can run:
@@ -14,10 +14,10 @@ There are two instruction types that the simulator can run:
 ## Input format
 The emulator will be fed multiple input files, `input_0.txt` to `input_n.txt` where `n` is the number of threads we support. Each of the files will be read by individual threads which will run the instructions. 
 
-There is a global memory area `memory`, and each "cpu core" will have it's own cache area `c`. Make sure you understand the code and feel free to ask for any questions you have with the code.
+There is a global memory area `memory`, and each "cpu core" will have it's own cache area `c`.
 
 ## Output format
-The output format should be a bunch of print statements:
+The output format is a bunch of print statements of format:
 ```
 Thread <thread_num>: RD <address>: <current_value>
 Thread <thread_num>: WR <address>: <current_value>

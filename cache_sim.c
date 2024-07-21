@@ -38,14 +38,6 @@ typedef struct cache cache;
 typedef struct decoded_inst decoded;
 typedef struct bus_transaction transaction;
 
-/*
- * This is a very basic C cache simulator.
- * The input files for each "Core" must be named core_1.txt, core_2.txt, core_3.txt ... core_n.txt
- * Input files consist of the following instructions:
- * - RD <address>
- * - WR <address> <val>
- */
-
 const char *files[] = {"inputs/core_1.txt", "inputs/core_2.txt", "inputs/core_3.txt", "inputs/core_4.txt"};
 byte *memory;
 transaction *shared_bus;
