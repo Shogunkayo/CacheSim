@@ -5,7 +5,7 @@ The program reads a file `input_0.txt` which consists of a set of instructions, 
 
 This cache simulator is parallelized using simulator using OpenMP, turning the single core cache simulator into a multi-core cache simulator. To maintain cache coherence, MESI protocol is implemented.
 
-![state machine](https://github.com/Shogunkayo/CacheSim/tree/master/diagrams/statemachine.png)
+![state machine](https://github.com/Shogunkayo/CacheSim/blob/master/diagrams/statemachine.png)
 
 ## Instruction type:
 There are two instruction types that the simulator can run:
